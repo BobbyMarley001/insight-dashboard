@@ -1,0 +1,132 @@
+﻿# Directory structure (project root)
+.
+├── backend
+│   ├── app.py               # Flask app
+│   ├── db_import.py         # Script to load JSON to MongoDB
+│   ├── requirements.txt     # Flask, pymongo, flask-cors
+│   └── config.py            # DB config
+├── frontend
+│   ├── public
+│   └── src
+│       ├── components
+│       │   ├── Dashboard.jsx
+│       │   ├── Filters.jsx
+│       │   └── Charts.jsx
+│       ├── App.js
+│       ├── index.js
+│       └── api.js
+└── jsondata.json
+
+# === backend/app.py ===
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from pymongo import MongoClient
+import os
+
+app = Flask(__name__)
+CORS(app)
+
+client = MongoClient("mongodb://localhost:27017/")
+db = client["dashboard"]
+collection = db["insights"]
+
+@app.route("/api/data")
+def get_data():
+    query = {}
+    filters = ["end_year", "topic", "sector", "region", "pestle", "source", "swot", "country", "city"]
+    for f in filters:
+        value = request.args.get(f)
+        if value:
+            query[f] = value
+
+    result = list(collection.find(query, {"_id": 0}))
+    return jsonify(result)
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+# === frontend/src/api.js ===
+export const fetchData = async (filters) => {
+  const query = new URLSearchParams(filters).toString();
+  const res = await fetch(`http://localhost:5000/api/data?${query}`);
+  return res.json();
+};
+
+# === frontend/src/components/Dashboard.jsx ===
+import React, { useState, useEffect } from 'react';
+import Filters from './Filters';
+import Charts from './Charts';
+import { fetchData } from '../api';
+
+const Dashboard = () => {
+  const [filters, setFilters] = useState({});
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    fetchData(filters).then(setData);
+  }, [filters]);
+
+  return (
+    <div className="container">
+      <h2>Visualization Dashboard</h2>
+      <Filters onChange={setFilters} />
+      <Charts data={data} />
+    </div>
+  );
+};
+
+export default Dashboard;
+
+# === frontend/src/components/Filters.jsx ===
+import React from 'react';
+
+const Filters = ({ onChange }) => {
+  const handleChange = (e) => {
+    onChange(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  return (
+    <div className="filters">
+      <select name="end_year" onChange={handleChange}><option value="">End Year</option><option>2025</option><option>2027</option></select>
+      <input name="topic" placeholder="Topic" onChange={handleChange} />
+      <input name="sector" placeholder="Sector" onChange={handleChange} />
+      <input name="region" placeholder="Region" onChange={handleChange} />
+      <input name="pestle" placeholder="PEST" onChange={handleChange} />
+      <input name="source" placeholder="Source" onChange={handleChange} />
+      <input name="country" placeholder="Country" onChange={handleChange} />
+      <input name="city" placeholder="City" onChange={handleChange} />
+    </div>
+  );
+};
+
+export default Filters;
+
+# === frontend/src/components/Charts.jsx ===
+import React from 'react';
+import { Bar, Line, Pie } from 'react-chartjs-2';
+
+const Charts = ({ data }) => {
+  const grouped = (field) => data.reduce((acc, item) => {
+    if (!item[field]) return acc;
+    acc[item[field]] = (acc[item[field]] || 0) + 1;
+    return acc;
+  }, {});
+
+  const createChartData = (field, label) => {
+    const values = grouped(field);
+    return {
+      labels: Object.keys(values),
+      datasets: [{ label, data: Object.values(values), backgroundColor: '#66f' }]
+    };
+  };
+
+  return (
+    <>
+      <Bar data={createChartData("country", "Entries by Country")} />
+      <Line data={createChartData("end_year", "Trends by Year")} />
+      <Pie data={createChartData("topic", "Topics Distribution")} />
+    </>
+  );
+};
+
+export default Charts;
