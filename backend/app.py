@@ -12,8 +12,8 @@ CORS(app)  # Allow frontend (React) to connect
 # -------------------------------
 # MongoDB connection (via environment variable)
 # -------------------------------
-MONGO_URI = os.environ.get("mongodb+srv://psychology001:P$ych0l0gy#001@cluster0.gsvno.mongodb.net/dashboard?retryWrites=true&w=majority")  # Set this in Render environment variables
-client = MongoClient(MONGO_URI)
+MONGODB_URI = os.environ.get("MONGODB_URI")
+client = MongoClient(MONGODB_URI)
 db = client["dashboard"]
 collection = db["insights"]
 
