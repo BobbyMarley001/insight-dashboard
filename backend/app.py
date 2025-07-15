@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
+import os
 
 # -------------------------------
 # Initialize Flask app
@@ -9,11 +10,19 @@ app = Flask(__name__)
 CORS(app)  # Allow frontend (React) to connect
 
 # -------------------------------
-# MongoDB connection
+# MongoDB connection (via environment variable)
 # -------------------------------
-client = MongoClient("mongodb://localhost:27017/")
+MONGO_URI = os.environ.get("mongodb+srv://psychology001:P$ych0l0gy#001@cluster0.gsvno.mongodb.net/dashboard?retryWrites=true&w=majority")  # Set this in Render environment variables
+client = MongoClient(MONGO_URI)
 db = client["dashboard"]
 collection = db["insights"]
+
+# -------------------------------
+# Optional: Home route for sanity check
+# -------------------------------
+@app.route("/")
+def home():
+    return "✅ Insight Dashboard API is live!"
 
 # -------------------------------
 # Route: Get filtered insights
@@ -23,7 +32,6 @@ collection = db["insights"]
 def get_data():
     query = {}
     filters = ["end_year", "start_year", "topic", "sector", "region", "pestle", "source", "country", "city"]
-
     for field in filters:
         value = request.args.get(field)
         if value:
@@ -42,8 +50,7 @@ def get_topics():
     return jsonify(cleaned)
 
 # -------------------------------
-# Route: Get countries (optionally filtered by topic)
-# Example: /api/countries or /api/countries?topic=oil
+# Route: Get all unique countries (optionally filter by topic)
 # -------------------------------
 @app.route("/api/countries")
 def get_countries():
@@ -56,7 +63,7 @@ def get_countries():
     return jsonify(cleaned)
 
 # -------------------------------
-# Route: Get regions (optional)
+# Route: Get unique regions
 # -------------------------------
 @app.route("/api/regions")
 def get_regions():
@@ -65,20 +72,16 @@ def get_regions():
     return jsonify(cleaned)
 
 # -------------------------------
-# Route: Get start years (cleaned + sorted numerically)
+# Route: Get all cleaned start years (numbers only)
 # -------------------------------
 @app.route("/api/years")
 def get_years():
     years = collection.distinct("start_year")
-
-    # Convert all years to strings, then check if digits, then back to int for sorting
-    cleaned = sorted(
-        {int(str(y)) for y in years if y is not None and str(y).strip().isdigit()}
-    )
-
+    cleaned = sorted({int(str(y)) for y in years if y is not None and str(y).strip().isdigit()})
     return jsonify(cleaned)
+
 # -------------------------------
-# Run Flask app
+# Start the Flask app
 # -------------------------------
 if __name__ == "__main__":
     app.run(debug=True)
